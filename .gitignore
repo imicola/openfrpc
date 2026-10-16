@@ -1,0 +1,23 @@
+# 依赖与构建产物
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# 本地视觉 QA 截图（含私有环境画面，不入库）
+qa/
+
+# 内部 review 材料（不出库）
+Review.md
+Review-evidence.zip
+
+# 日志与临时文件
+*.log
+*.local
+tmp/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
