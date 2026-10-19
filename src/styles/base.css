@@ -135,28 +135,32 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  padding: 18px 12px 14px;
+  padding: 0 12px 14px;
   overflow: hidden;               /* 收起时由容器遮显标签，不重排 */
   transition: width var(--t-space), background-color var(--t-ui), border-color var(--t-ui);
 }
 
 .sider.collapsed { width: var(--sider-w-collapsed); }
 
+/* 顶部留出避让，但侧栏底色仍伸到窗口最上方；图标中心固定在 32px，展开/收起不位移 */
 .sider-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 10px 18px;
+  flex: none;
+  height: 52px;
+  padding: 12px 3px 0;
   white-space: nowrap;
 }
 
+.sider-brand .brand-text { min-width: 0; }
 .sider-brand svg { flex: none; }
 .sider-brand .t { font-size: 15px; font-weight: 650; letter-spacing: 0.2px; transition: opacity var(--t-fast); }
 .sider-brand .s { font-size: 11.5px; color: var(--ink-3); margin-top: -2px; transition: opacity var(--t-fast); }
 .sider.collapsed .sider-brand .t,
 .sider.collapsed .sider-brand .s { opacity: 0; }
 
-.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
 
 .nav-item {
   display: flex;
@@ -200,7 +204,7 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 
 .nav-item svg { flex: none; opacity: 0.9; }
 
-/* 侧栏工具行：主题切换 + 收起 */
+/* 侧栏工具行：主题切换 */
 .sider-tools {
   margin-top: auto;
   display: flex;
@@ -230,11 +234,9 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .tool-btn .nav-label { transition: opacity var(--t-fast); }
 .sider.collapsed .tool-btn .nav-label { opacity: 0; }
 .tool-btn svg { flex: none; }
-.tool-btn .chev { transition: transform var(--t-space); }
-.sider.collapsed .tool-btn .chev { transform: rotate(180deg); }
 
 .sider-foot {
-  padding: 10px 12px 4px;
+  padding: 10px 15px 4px;
   border-top: 1px solid var(--line);
   font-size: 12px;
   color: var(--ink-3);
@@ -253,6 +255,84 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .main {
   flex: 1;
   min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 侧栏开关：侧栏外的悬浮圆钮，顶部留出避让 */
+.sidebar-toggle {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  z-index: 30;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 12px rgba(16, 24, 40, 0.07);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.sidebar-toggle:hover {
+  background: var(--surface-2);
+  border-color: var(--line-2);
+  color: var(--ink);
+  box-shadow: 0 2px 4px rgba(16, 24, 40, 0.06), 0 6px 16px rgba(16, 24, 40, 0.09);
+}
+
+.sidebar-toggle:active { transform: translateY(0.5px); }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+.sidebar-toggle svg { display: block; }
+
+/* ---------- 自绘标题栏：与页面同底色、无分隔线，内容从顶部延伸 ---------- */
+.titlebar {
+  flex: none;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 8px 0 16px;
+  background: var(--bg);
+  user-select: none;
+  transition: background-color var(--t-ui);
+}
+
+.win-controls { display: flex; align-items: center; gap: 2px; }
+
+.win-btn {
+  width: 34px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.win-btn:hover { background: var(--surface-2); color: var(--ink); }
+.win-btn:active { background: var(--line); }
+.win-btn.close:hover { background: var(--danger); color: #fff; }
+.win-btn.close:active { background: var(--danger); opacity: 0.86; }
+.win-btn:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: -2px; }
+.win-btn svg { display: block; }
+
+.viewport {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -260,7 +340,7 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .page {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 26px var(--pad) 48px;
+  padding: 12px var(--pad) 48px;
 }
 
 .page-enter-active { transition: opacity 180ms ease, transform 180ms ease; }
@@ -593,7 +673,7 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 /* ---------- Toast ---------- */
 .toast-wrap {
   position: fixed;
-  top: 18px;
+  top: 62px;
   right: 18px;
   z-index: 200;
   display: flex;

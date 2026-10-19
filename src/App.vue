@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAppStore } from "./stores/app";
 import { phaseInfo } from "./lib/format";
+import { isTauri } from "./lib/bridge";
 
 const store = useAppStore();
 const route = useRoute();
@@ -47,6 +48,35 @@ function toggleSidebar() {
   store.saveSettings({ sidebar_collapsed: !collapsed.value });
 }
 
+/* ---------- 自绘标题栏：窗口控制 ---------- */
+const isMaximized = ref(false);
+let appWindow = null;
+let unlistenResize = null;
+
+async function setupWindow() {
+  if (!isTauri) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    appWindow = getCurrentWindow();
+    isMaximized.value = await appWindow.isMaximized();
+    unlistenResize = await appWindow.onResized(async () => {
+      isMaximized.value = await appWindow.isMaximized();
+    });
+  } catch {
+    /* 权限缺失时保持默认图标，不阻断界面 */
+  }
+}
+
+async function minimizeWindow() {
+  try { await appWindow?.minimize(); } catch { /* ignore */ }
+}
+async function toggleMaximizeWindow() {
+  try { await appWindow?.toggleMaximize(); } catch { /* ignore */ }
+}
+async function closeWindow() {
+  try { await appWindow?.close(); } catch { /* ignore */ }
+}
+
 /* ---------- 图标 ---------- */
 const IconSun = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
   <circle cx="8" cy="8" r="2.6" stroke="currentColor" stroke-width="1.5"/>
@@ -58,17 +88,21 @@ const IconMoon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
 
 onMounted(() => {
   store.boot();
+  setupWindow();
   mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   systemDark.value = mediaQuery.matches;
   mediaQuery.addEventListener("change", onMedia);
 });
-onBeforeUnmount(() => mediaQuery?.removeEventListener("change", onMedia));
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener("change", onMedia);
+  unlistenResize?.();
+});
 </script>
 
 <template>
   <div class="shell" v-if="store.ready">
     <aside class="sider" :class="{ collapsed }">
-      <div class="sider-brand">
+      <div class="sider-brand" data-tauri-drag-region="deep">
         <!-- OpenFrpc 标识：开口环 + 穿出的箭头（几何与 raster 图标一致：环心20,20 R12 缺口±36°） -->
         <svg width="34" height="34" viewBox="0 0 40 40">
           <rect x="1" y="1" width="38" height="38" rx="9" fill="#182636" stroke="rgba(255,255,255,0.14)" stroke-width="1" />
@@ -76,7 +110,7 @@ onBeforeUnmount(() => mediaQuery?.removeEventListener("change", onMedia));
           <rect x="3" y="18" width="26" height="4" rx="1" fill="#fff" />
           <path d="M 28.8 13.4 L 37.2 20 L 28.8 26.6 Z" fill="#fff" />
         </svg>
-        <div>
+        <div class="brand-text">
           <div class="t">OpenFrpc</div>
           <div class="s">frp 控制台</div>
         </div>
@@ -120,12 +154,6 @@ onBeforeUnmount(() => mediaQuery?.removeEventListener("change", onMedia));
           <span v-html="resolvedTheme === 'dark' ? IconSun : IconMoon"></span>
           <span class="nav-label">{{ resolvedTheme === "dark" ? "浅色模式" : "深色模式" }}</span>
         </button>
-        <button class="tool-btn" @click="toggleSidebar" :title="collapsed ? '展开侧栏' : '收起侧栏'">
-          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3.5 L5.5 8 L10 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-          <span class="nav-label">收起侧栏</span>
-        </button>
       </div>
 
       <div class="sider-foot" :title="`frpc ${phaseInfo(store.status.phase).text}`">
@@ -136,11 +164,47 @@ onBeforeUnmount(() => mediaQuery?.removeEventListener("change", onMedia));
     </aside>
 
     <main class="main">
-      <router-view v-slot="{ Component }">
-        <Transition name="page" mode="out-in">
-          <component :is="Component" :key="route.path" />
-        </Transition>
-      </router-view>
+      <!-- 侧栏开关：悬浮于内容区左上角，随侧栏宽度平移 -->
+      <button class="sidebar-toggle" type="button" :title="collapsed ? '展开侧栏' : '收起侧栏'"
+        :aria-label="collapsed ? '展开侧栏' : '收起侧栏'" :aria-expanded="!collapsed" @click="toggleSidebar">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6.3h8M4 9.7h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        </svg>
+      </button>
+
+      <!-- 自绘标题栏：整条空白区域可拖动，右侧为项目风格的窗口控制按钮 -->
+      <header class="titlebar" data-tauri-drag-region="deep">
+        <div class="win-controls">
+          <button class="win-btn" type="button" title="最小化" aria-label="最小化" @click="minimizeWindow">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M3.5 8h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </button>
+          <button class="win-btn" type="button" :title="isMaximized ? '还原' : '最大化'"
+            :aria-label="isMaximized ? '还原' : '最大化'" @click="toggleMaximizeWindow">
+            <svg v-if="isMaximized" width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <rect x="3.2" y="5.4" width="7.4" height="7.4" rx="1.3" stroke="currentColor" stroke-width="1.4" />
+              <path d="M5.8 3.6h5.4a1.2 1.2 0 0 1 1.2 1.2v5.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <svg v-else width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <rect x="3.6" y="3.6" width="8.8" height="8.8" rx="1.4" stroke="currentColor" stroke-width="1.4" />
+            </svg>
+          </button>
+          <button class="win-btn close" type="button" title="关闭" aria-label="关闭" @click="closeWindow">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="viewport">
+        <router-view v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" :key="route.path" />
+          </Transition>
+        </router-view>
+      </div>
     </main>
 
     <div class="toast-wrap">
